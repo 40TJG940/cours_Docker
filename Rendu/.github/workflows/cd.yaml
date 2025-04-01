@@ -1,0 +1,34 @@
+name: CD Pipeline
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    branches: [main]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Helm
+        uses: azure/setup-helm@v3
+        with:
+          version: 'latest'
+      
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+        
+      - name: Set Kubernetes Config
+        run: |
+          echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig
+          export KUBECONFIG=kubeconfig
+      
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install flaskapp ./helm/flaskapp \
+            --set image.repository=${{ secrets.DOCKER_USERNAME }}/flaskapp \
+            --set image.tag=latest
